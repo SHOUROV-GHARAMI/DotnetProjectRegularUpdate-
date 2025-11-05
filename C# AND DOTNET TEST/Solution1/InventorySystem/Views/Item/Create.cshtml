@@ -1,0 +1,21 @@
+@model InventorySystem.Models.Item
+@{
+    ViewData["Title"] = "Create Item";
+}
+<h2>Create Item</h2>
+<form asp-action="Create" method="post" class="row g-3">
+    <input type="hidden" asp-for="InventoryId" />
+    <div class="col-12">
+        <label asp-for="Name" class="form-label"></label>
+        <input asp-for="Name" class="form-control" />
+    </div>
+    <div class="col-12">
+        <label class="form-label">Custom Fields (JSON)</label>
+        <textarea asp-for="CustomFieldsJson" class="form-control" rows="5" placeholder='{"color":"red","size":10}'></textarea>
+        <div class="form-text">Use JSON to store custom attributes for this product (key/value pairs).</div>
+    </div>
+    <div class="col-12">
+        <button type="submit" class="btn btn-primary">Create</button>
+        <a asp-action="Index" asp-controller="Inventory" class="btn btn-link">Back</a>
+    </div>
+</form>

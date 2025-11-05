@@ -1,0 +1,120 @@
+@model InventorySystem.Models.Inventory
+
+@{
+    ViewData["Title"] = "Inventory Settings - Custom ID";
+}
+
+<h2>Custom ID</h2>
+<p>Build a pattern for item Custom IDs. Available tokens: {YYYY}, {MM}, {DD}, {SEQ}, {RANDOM:N}</p>
+
+<div>
+    <label>Current pattern</label>
+    <input id="patternInput" type="text" value="@Model.CustomIdPattern" style="width:60%" />
+    <button id="saveBtn" class="btn btn-primary">Save</button>
+</div>
+
+<div style="margin-top:1rem">
+    <label>Add element</label>
+    <select id="elementType">
+        <option value="literal">Fixed text</option>
+        <option value="random">Random (RANDOM:N)</option>
+        <option value="sequence">Sequence (SEQ)</option>
+        <option value="date">Date/time</option>
+    </select>
+    <input id="elementValue" placeholder="text or parameter (e.g. 5 for RANDOM:5 or yyyy for date)" />
+    <button id="addBtn" class="btn">Add</button>
+</div>
+
+<div style="margin-top:1rem">
+    <h4>Elements</h4>
+    <ul id="elementsList"></ul>
+</div>
+
+<div style="margin-top:1rem">
+    <button id="previewBtn" class="btn btn-secondary">Preview</button>
+    <div id="previewArea" style="margin-top:.5rem"></div>
+</div>
+
+@section Scripts {
+    <script>
+        const patternInput = document.getElementById('patternInput');
+        const elementType = document.getElementById('elementType');
+        const elementValue = document.getElementById('elementValue');
+        const elementsList = document.getElementById('elementsList');
+        const addBtn = document.getElementById('addBtn');
+        const saveBtn = document.getElementById('saveBtn');
+        const previewBtn = document.getElementById('previewBtn');
+        const previewArea = document.getElementById('previewArea');
+
+        const elements = [];
+
+        function renderElements() {
+            elementsList.innerHTML = '';
+            elements.forEach((el, idx) => {
+                const li = document.createElement('li');
+                li.textContent = el.display;
+                const up = document.createElement('button'); up.textContent = '↑'; up.onclick = () => { if (idx>0){ [elements[idx-1], elements[idx]] = [elements[idx], elements[idx-1]]; renderElements(); } };
+                const down = document.createElement('button'); down.textContent = '↓'; down.onclick = () => { if (idx<elements.length-1){ [elements[idx+1], elements[idx]] = [elements[idx], elements[idx+1]]; renderElements(); } };
+                const remove = document.createElement('button'); remove.textContent = 'x'; remove.onclick = () => { elements.splice(idx,1); renderElements(); };
+                li.appendChild(up); li.appendChild(down); li.appendChild(remove);
+                elementsList.appendChild(li);
+            });
+            // update patternInput to reflect elements
+            patternInput.value = elements.map(e => e.token).join('');
+        }
+
+        addBtn.addEventListener('click', () => {
+            const type = elementType.value;
+            const val = elementValue.value || '';
+            let token = '';
+            let display = '';
+            if (type === 'literal') { token = val; display = `Fixed: "${val}"`; }
+            else if (type === 'random') { token = `{RANDOM:${val || 4}}`; display = `Random (${val || 4})`; }
+            else if (type === 'sequence') { token = `{SEQ}`; display = 'Sequence'; }
+            else if (type === 'date') { token = `{${val || 'yyyy'}}`; display = `Date: ${val || 'yyyy'}`; }
+            elements.push({ token, display });
+            elementValue.value = '';
+            renderElements();
+        });
+
+        saveBtn.addEventListener('click', async () => {
+            const id = '@Model.Id';
+            const pattern = patternInput.value;
+            const form = new FormData();
+            form.append('customIdPattern', pattern);
+            const res = await fetch(`/Inventory/Settings?id=${id}`, { method: 'POST', body: form });
+            if (res.ok) {
+                alert('Saved');
+            } else {
+                alert('Save failed');
+            }
+        });
+
+        previewBtn.addEventListener('click', async () => {
+            const id = '@Model.Id';
+            const pattern = patternInput.value;
+            const res = await fetch(`/Inventory/PreviewCustomId?id=${id}`, { method: 'POST', headers: { 'Content-Type':'application/x-www-form-urlencoded' }, body: `pattern=${encodeURIComponent(pattern)}` });
+            const json = await res.json();
+            if (json.ok) previewArea.textContent = json.sample; else previewArea.textContent = 'Error: ' + json.error;
+        });
+
+        // initialize from current pattern
+        (function init(){
+            const pat = patternInput.value || '';
+            if (!pat) return;
+            // naive parse: split tokens {..} and literals
+            const parts = pat.split(/(\{[^}]+\})/g).filter(Boolean);
+            for (const p of parts) {
+                if (p.startsWith('{') && p.endsWith('}')) {
+                    const inside = p.substring(1,p.length-1);
+                    if (inside.startsWith('RANDOM')) elements.push({ token: p, display: 'Random' });
+                    else if (inside === 'SEQ') elements.push({ token: p, display: 'Sequence' });
+                    else elements.push({ token: p, display: 'Date: '+inside });
+                } else {
+                    elements.push({ token: p, display: `Fixed: "${p}"` });
+                }
+            }
+            renderElements();
+        })();
+    </script>
+}
